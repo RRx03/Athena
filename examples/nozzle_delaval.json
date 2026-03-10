@@ -1,0 +1,42 @@
+{
+  "problem": "nozzle_delaval",
+  "units": "SI",
+  "materials": {
+    "propellant": { "name": "LOX/RP-1", "properties": { "gamma": 1.2, "R_specific": 362.0 } },
+    "wall": { "name": "Inconel 718", "properties": { "yield_strength": 1035e6, "safety_factor": 1.5, "density": 8190.0, "max_service_temperature": 1000.0 } }
+  },
+  "named_points": {
+    "INLET_CENTER": { "position": ["0","0","0"], "type": "fixed" },
+    "ENDTUYERE": { "position": ["0","0","param:L_nozzle"], "type": "constrained" },
+    "THROAT": { "position": ["0","0","param:z_throat"], "type": "variable" }
+  },
+  "boundary_conditions": [
+    { "id": "inlet", "geometry": { "type": "Disk2D", "center": "point:INLET_CENTER", "normal_axis": "z", "radius": "0.04" }, "distributions": { "total_pressure": { "type": "uniform", "value": "7e6" }, "total_temperature": { "type": "uniform", "value": "3500.0" } }, "anchors": { "axis_alignment": "z" } },
+    { "id": "outlet", "geometry": { "type": "Disk2D", "center": "point:ENDTUYERE", "normal_axis": "z", "radius": "param:r_exit" }, "distributions": { "static_pressure": { "type": "target", "value": "101325.0", "tolerance": "0.05" } }, "anchors": { "concentric_with": "inlet", "distance_along_axis": "param:L_nozzle" } }
+  ],
+  "constraints": [
+    { "id": "thrust", "type": "performance", "quantity": "thrust", "op": ">=", "value": "50000.0", "priority": 1 },
+    { "id": "structural", "type": "structural", "quantity": "von_mises_max", "op": "<", "value": "expr:material:wall.yield_strength / material:wall.safety_factor", "priority": 1 },
+    { "id": "mass", "type": "mass", "quantity": "total_mass", "op": "minimize", "priority": 3 }
+  ],
+  "field_constraints": [
+    { "id": "monotonic_mach", "coordinate_system": "axisymmetric", "domain": { "type": "parametric_1d", "variables": ["z"], "ranges": { "z": ["point:THROAT.z","point:ENDTUYERE.z"] }, "samples": [30] }, "relation": { "lhs": "field:mach@[0, z + 0.001]", "op": ">=", "rhs": "field:mach@[0, z]" }, "tolerance": 0.0, "priority": 1 }
+  ],
+  "parameters": {
+    "r_exit": { "type": "variable", "value": 0.035, "bounds": [0.01, 0.15] },
+    "r_throat": { "type": "variable", "value": 0.015, "bounds": [0.005, 0.04] },
+    "L_nozzle": { "type": "variable", "value": 0.3, "bounds": [0.1, 0.5] },
+    "z_throat": { "type": "variable", "value": 0.12, "bounds": [0.05, 0.25] },
+    "wall_thickness": { "type": "derived", "expression": "pressure_vessel" },
+    "profile_r": { "type": "variable_array", "size": 7, "bounds": [0.005, 0.15] }
+  },
+  "optimization": {
+    "mode": "dynamic",
+    "method": "nelder_mead",
+    "precision": "standard",
+    "dynamic_params": { "fidelity_levels": [
+      { "samples": 10, "max_iterations": 100, "physics": "isentropic_1d" },
+      { "samples": 50, "max_iterations": 50, "physics": "isentropic_1d" }
+    ] }
+  }
+}
