@@ -95,9 +95,18 @@ struct OptimizationConfig {
   std::map<std::string, float> criteriaTolerances;
 };
 
+struct FrameConfig {
+  std::string mode; // "auto" or "manual"
+  // Manual mode only:
+  std::array<float, 3> origin = {0, 0, 0};
+  std::array<float, 3> axis = {0, 0, 1};
+  std::array<float, 3> up = {0, 1, 0};
+};
+
 struct ProblemDefinition {
   std::string problemType;
   std::string units;
+  FrameConfig frame; // auto or manual origin/axis
   std::map<std::string, MaterialProperties> materials;
   std::map<std::string, NamedPoint> namedPoints;
   std::vector<BoundaryCondition> boundaryConditions;
