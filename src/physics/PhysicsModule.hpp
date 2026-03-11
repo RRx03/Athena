@@ -1,6 +1,6 @@
 #pragma once
-#include "ExpressionEvaluator.hpp"
-#include "ProblemDefinition.hpp"
+#include "../ExpressionEvaluator.hpp"
+#include "../ProblemDefinition.hpp"
 #include <simd/simd.h>
 #include <string>
 

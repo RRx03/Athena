@@ -1,6 +1,5 @@
-build/objs/tests.o: src/tests.cpp src/ExpressionEvaluator.hpp \
-  src/ProblemParser.hpp src/ProblemDefinition.hpp \
-  /opt/homebrew/include/nlohmann/json.hpp \
+build/objs/ProblemParser.o: src/ProblemParser.cpp src/ProblemParser.hpp \
+  src/ProblemDefinition.hpp /opt/homebrew/include/nlohmann/json.hpp \
   /opt/homebrew/include/nlohmann/adl_serializer.hpp \
   /opt/homebrew/include/nlohmann/detail/abi_macros.hpp \
   /opt/homebrew/include/nlohmann/detail/conversions/from_json.hpp \
@@ -46,7 +45,6 @@ build/objs/tests.o: src/tests.cpp src/ExpressionEvaluator.hpp \
   /opt/homebrew/include/nlohmann/ordered_map.hpp \
   /opt/homebrew/include/nlohmann/detail/macro_unscope.hpp \
   /opt/homebrew/include/nlohmann/thirdparty/hedley/hedley_undef.hpp
-src/ExpressionEvaluator.hpp:
 src/ProblemParser.hpp:
 src/ProblemDefinition.hpp:
 /opt/homebrew/include/nlohmann/json.hpp:

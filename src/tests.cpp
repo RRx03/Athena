@@ -1,4 +1,5 @@
 #include "ExpressionEvaluator.hpp"
+#include "ProblemParser.hpp"
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -9,6 +10,37 @@ static void check(const std::string &name, float got, float expected, float eps 
   if (std::abs(got - expected) < eps) { passed++; }
   else {
     std::cerr << "  ECHEC: " << name << " — attendu " << expected << " obtenu " << got << std::endl;
+    failed++;
+  }
+}
+
+static void checkStr(const std::string &name, const std::string &got,
+                     const std::string &expected) {
+  if (got == expected) {
+    passed++;
+  } else {
+    std::cerr << "  ECHEC: " << name << " — attendu '" << expected
+              << "' obtenu '" << got << "'" << std::endl;
+    failed++;
+  }
+}
+
+static void checkBool(const std::string &name, bool got, bool expected) {
+  if (got == expected) {
+    passed++;
+  } else {
+    std::cerr << "  ECHEC: " << name << " — attendu " << expected << " obtenu "
+              << got << std::endl;
+    failed++;
+  }
+}
+
+static void checkInt(const std::string &name, int got, int expected) {
+  if (got == expected) {
+    passed++;
+  } else {
+    std::cerr << "  ECHEC: " << name << " — attendu " << expected << " obtenu "
+              << got << std::endl;
     failed++;
   }
 }
@@ -94,6 +126,110 @@ void runTests() {
   check("area_ratio", ExpressionEvaluator::evaluate("expr:(param:r_exit / param:r_throat) ^ 2", ctx),
         (0.035f / 0.015f) * (0.035f / 0.015f));
   check("mixed", ExpressionEvaluator::evaluate("expr:2 * field:velocity@[0, 0, domain:z]", ctx), 1000.0f);
+
+  // ═══════════════════════════════════════════════════════════
+  // Phase 2 — ProblemParser
+  // ═══════════════════════════════════════════════════════════
+  std::cout << "\n=== PHASE 2 : ProblemParser ===" << std::endl;
+
+  try {
+    auto pd = ProblemParser::parseFile("examples/nozzle_delaval.json");
+
+    std::cout << "--- Meta ---" << std::endl;
+    checkStr("problemType", pd.problemType, "nozzle_delaval");
+    checkStr("units", pd.units, "SI");
+    checkStr("frame.mode", pd.frame.mode, "auto");
+
+    std::cout << "--- Materials ---" << std::endl;
+    checkBool("has propellant", pd.materials.count("propellant") > 0, true);
+    checkBool("has wall", pd.materials.count("wall") > 0, true);
+    checkStr("wall name", pd.materials["wall"].name, "Inconel 718");
+    check("gamma", pd.materials["propellant"].properties["gamma"], 1.2f);
+    check("yield", pd.materials["wall"].properties["yield_strength"], 1035e6f);
+    check("SF", pd.materials["wall"].properties["safety_factor"], 1.5f);
+
+    std::cout << "--- Named Points ---" << std::endl;
+    checkInt("num points", (int)pd.namedPoints.size(), 3);
+    checkStr("INLET type", pd.namedPoints["INLET_CENTER"].type, "fixed");
+    checkStr("INLET pos[0]", pd.namedPoints["INLET_CENTER"].position[0], "0");
+    checkStr("ENDTUYERE type", pd.namedPoints["ENDTUYERE"].type, "constrained");
+    checkStr("ENDTUYERE pos[2]", pd.namedPoints["ENDTUYERE"].position[2],
+             "param:L_nozzle");
+    checkStr("THROAT type", pd.namedPoints["THROAT"].type, "variable");
+
+    std::cout << "--- Boundary Conditions ---" << std::endl;
+    checkInt("num BCs", (int)pd.boundaryConditions.size(), 2);
+    checkStr("BC0 id", pd.boundaryConditions[0].id, "inlet");
+    checkStr("BC0 geom type", pd.boundaryConditions[0].geometryType, "Disk2D");
+    checkStr("BC0 radius", pd.boundaryConditions[0].geometryParams["radius"],
+             "0.04");
+    checkStr("BC0 P type",
+             pd.boundaryConditions[0].distributions["total_pressure"].type,
+             "uniform");
+    checkStr(
+        "BC0 P value",
+        pd.boundaryConditions[0].distributions["total_pressure"].expression,
+        "7e6");
+    checkStr("BC1 id", pd.boundaryConditions[1].id, "outlet");
+    checkStr("BC1 radius", pd.boundaryConditions[1].geometryParams["radius"],
+             "param:r_exit");
+    checkStr("BC1 anchor", pd.boundaryConditions[1].anchors["concentric_with"],
+             "inlet");
+
+    std::cout << "--- Constraints ---" << std::endl;
+    checkInt("num constraints", (int)pd.constraints.size(), 3);
+    checkStr("C0 id", pd.constraints[0].id, "thrust");
+    checkStr("C0 op", pd.constraints[0].op, ">=");
+    checkStr("C0 value", pd.constraints[0].value, "50000.0");
+    checkInt("C0 priority", pd.constraints[0].priority, 1);
+    checkStr("C2 op", pd.constraints[2].op, "minimize");
+
+    std::cout << "--- Field Constraints ---" << std::endl;
+    checkInt("num FC", (int)pd.fieldConstraints.size(), 1);
+    checkStr("FC0 id", pd.fieldConstraints[0].id, "monotonic_mach");
+    checkStr("FC0 coord", pd.fieldConstraints[0].coordinateSystem,
+             "axisymmetric");
+    checkStr("FC0 domain type", pd.fieldConstraints[0].domain.type,
+             "parametric_1d");
+    checkInt("FC0 domain vars",
+             (int)pd.fieldConstraints[0].domain.variables.size(), 1);
+    checkStr("FC0 domain var[0]", pd.fieldConstraints[0].domain.variables[0],
+             "z");
+    checkStr("FC0 lhs", pd.fieldConstraints[0].lhs,
+             "field:mach@[0, z + 0.001]");
+    checkStr("FC0 op", pd.fieldConstraints[0].op, ">=");
+    checkStr("FC0 rhs", pd.fieldConstraints[0].rhs, "field:mach@[0, z]");
+    checkInt("FC0 samples", pd.fieldConstraints[0].domain.samples[0], 30);
+
+    std::cout << "--- Parameters ---" << std::endl;
+    checkInt("num params", (int)pd.parameters.size(), 6);
+    checkStr("r_exit type", pd.parameters["r_exit"].type, "variable");
+    check("r_exit value", pd.parameters["r_exit"].value, 0.035f);
+    check("r_exit lo", pd.parameters["r_exit"].lo, 0.01f);
+    check("r_exit hi", pd.parameters["r_exit"].hi, 0.15f);
+    checkStr("wall type", pd.parameters["wall_thickness"].type, "derived");
+    checkStr("wall expr", pd.parameters["wall_thickness"].expression,
+             "pressure_vessel");
+    checkStr("profile type", pd.parameters["profile_r"].type, "variable_array");
+    checkInt("profile size", pd.parameters["profile_r"].arraySize, 7);
+
+    std::cout << "--- Optimization ---" << std::endl;
+    checkStr("opt mode", pd.optimization.mode, "dynamic");
+    checkStr("opt method", pd.optimization.method, "nelder_mead");
+    checkStr("opt precision", pd.optimization.precision, "standard");
+    checkInt("fidelity levels", (int)pd.optimization.fidelityLevels.size(), 2);
+    checkInt("level0 samples", pd.optimization.fidelityLevels[0].samples, 10);
+    checkInt("level0 maxiter", pd.optimization.fidelityLevels[0].maxIterations,
+             100);
+    checkStr("level0 physics", pd.optimization.fidelityLevels[0].physicsModel,
+             "isentropic_1d");
+    checkInt("level1 samples", pd.optimization.fidelityLevels[1].samples, 50);
+
+    std::cout << "\n  Phase 2 : ProblemParser OK" << std::endl;
+  } catch (const std::exception &e) {
+    std::cerr << "\n  ECHEC Phase 2 : " << e.what() << std::endl;
+    failed++;
+  }
 
   std::cout << "\n══════════════════════════════════════" << std::endl;
   std::cout << "  " << passed << " passés, " << failed << " échoués" << std::endl;
