@@ -1,6 +1,7 @@
-build/objs/tests.o: src/tests.cpp src/ExpressionEvaluator.hpp \
-  src/ProblemParser.hpp src/ProblemDefinition.hpp \
-  /opt/homebrew/include/nlohmann/json.hpp \
+build/objs/tests.o: src/tests.cpp src/ConstraintChecker.hpp \
+  src/ProblemDefinition.hpp src/CoordinateResolver.hpp \
+  src/ExpressionEvaluator.hpp src/ParameterSpace.hpp \
+  src/ProblemParser.hpp /opt/homebrew/include/nlohmann/json.hpp \
   /opt/homebrew/include/nlohmann/adl_serializer.hpp \
   /opt/homebrew/include/nlohmann/detail/abi_macros.hpp \
   /opt/homebrew/include/nlohmann/detail/conversions/from_json.hpp \
@@ -45,10 +46,16 @@ build/objs/tests.o: src/tests.cpp src/ExpressionEvaluator.hpp \
   /opt/homebrew/include/nlohmann/detail/conversions/to_chars.hpp \
   /opt/homebrew/include/nlohmann/ordered_map.hpp \
   /opt/homebrew/include/nlohmann/detail/macro_unscope.hpp \
-  /opt/homebrew/include/nlohmann/thirdparty/hedley/hedley_undef.hpp
-src/ExpressionEvaluator.hpp:
-src/ProblemParser.hpp:
+  /opt/homebrew/include/nlohmann/thirdparty/hedley/hedley_undef.hpp \
+  src/physics/IsentropicNozzle.hpp src/physics/PhysicsModule.hpp \
+  src/physics/../ExpressionEvaluator.hpp \
+  src/physics/../ProblemDefinition.hpp src/physics/PressureVessel.hpp
+src/ConstraintChecker.hpp:
 src/ProblemDefinition.hpp:
+src/CoordinateResolver.hpp:
+src/ExpressionEvaluator.hpp:
+src/ParameterSpace.hpp:
+src/ProblemParser.hpp:
 /opt/homebrew/include/nlohmann/json.hpp:
 /opt/homebrew/include/nlohmann/adl_serializer.hpp:
 /opt/homebrew/include/nlohmann/detail/abi_macros.hpp:
@@ -95,3 +102,8 @@ src/ProblemDefinition.hpp:
 /opt/homebrew/include/nlohmann/ordered_map.hpp:
 /opt/homebrew/include/nlohmann/detail/macro_unscope.hpp:
 /opt/homebrew/include/nlohmann/thirdparty/hedley/hedley_undef.hpp:
+src/physics/IsentropicNozzle.hpp:
+src/physics/PhysicsModule.hpp:
+src/physics/../ExpressionEvaluator.hpp:
+src/physics/../ProblemDefinition.hpp:
+src/physics/PressureVessel.hpp:
