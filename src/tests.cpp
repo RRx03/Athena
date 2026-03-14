@@ -1,17 +1,10 @@
-#include "ConstraintChecker.hpp"
-#include "CoordinateResolver.hpp"
-#include "ExpressionEvaluator.hpp"
-#include "ParameterSpace.hpp"
-#include "ProblemParser.hpp"
-#include "physics/IsentropicNozzle.hpp"
-#include "physics/PressureVessel.hpp"
-#include <cassert>
-#include <cmath>
-#include <iostream>
+
+#include "tests.hpp"
 
 static int passed = 0, failed = 0;
 
-static void check(const std::string &name, float got, float expected, float eps = 1e-4f) {
+static void check(const std::string &name, float got, float expected,
+                  float eps) {
   if (std::abs(got - expected) < eps) { passed++; }
   else {
     std::cerr << "  ECHEC: " << name << " — attendu " << expected << " obtenu " << got << std::endl;

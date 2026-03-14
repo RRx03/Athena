@@ -1,4 +1,4 @@
-build/objs/tests.o: src/tests.cpp src/ConstraintChecker.hpp \
+build/objs/tests.o: src/tests.cpp src/tests.hpp src/ConstraintChecker.hpp \
   src/ProblemDefinition.hpp src/CoordinateResolver.hpp \
   src/ExpressionEvaluator.hpp src/ParameterSpace.hpp \
   src/ProblemParser.hpp /opt/homebrew/include/nlohmann/json.hpp \
@@ -50,6 +50,7 @@ build/objs/tests.o: src/tests.cpp src/ConstraintChecker.hpp \
   src/physics/IsentropicNozzle.hpp src/physics/PhysicsModule.hpp \
   src/physics/../ExpressionEvaluator.hpp \
   src/physics/../ProblemDefinition.hpp src/physics/PressureVessel.hpp
+src/tests.hpp:
 src/ConstraintChecker.hpp:
 src/ProblemDefinition.hpp:
 src/CoordinateResolver.hpp:

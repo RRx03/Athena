@@ -1,8 +1,7 @@
 #include "Solver.hpp"
+#include "tests.hpp"
 #include <iostream>
 #include <string>
-
-void runTests();
 
 int main(int argc, char *argv[]) {
   std::cout << "╔══════════════════════════════════════╗" << std::endl;
