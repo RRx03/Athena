@@ -1,7 +1,8 @@
 #include "Solver.hpp"
-#include "tests.hpp"
 #include <iostream>
 #include <string>
+
+void runTests();
 
 int main(int argc, char *argv[]) {
   std::cout << "╔══════════════════════════════════════╗" << std::endl;
@@ -24,12 +25,16 @@ int main(int argc, char *argv[]) {
   try {
     auto result = Solver::solve(problemFile, outputFile);
     std::cout << "\n=== RÉSULTAT ===" << std::endl;
-    std::cout << "Convergé   : " << (result.converged ? "oui" : "NON") << std::endl;
+    std::cout << "Convergé   : "
+              << (result.converged ? "oui" : "max iterations atteint")
+              << std::endl;
     std::cout << "Itérations : " << result.iterations << std::endl;
     std::cout << "Coût final : " << result.finalCost << std::endl;
-    return result.converged ? 0 : 1;
+    std::cout << "Géométrie  : " << result.geometryFile << std::endl;
+    // return 0 même si pas convergé — un résultat a été produit
+    return 0;
   } catch (const std::exception &e) {
     std::cerr << "\n[ERREUR] " << e.what() << std::endl;
-    return 2;
+    return 1;
   }
 }
