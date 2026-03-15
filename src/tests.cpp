@@ -594,6 +594,17 @@ void runTests() {
       return nozzleC.fieldAt(f, p);
     };
 
+    // Résoudre les named_points
+    for (const auto &[name, np] : pd.namedPoints) {
+      try {
+        float x = ExpressionEvaluator::resolve(np.position[0], costCtx);
+        float y = ExpressionEvaluator::resolve(np.position[1], costCtx);
+        float z = ExpressionEvaluator::resolve(np.position[2], costCtx);
+        costCtx.namedPoints[name] = simd::float3{x, y, z};
+      } catch (...) {
+      }
+    }
+
     auto fv = FieldConstraintEvaluator::evaluate(pd.fieldConstraints, costCtx);
     auto cb = CostEvaluator::evaluate(pd, costCtx, fv);
 
