@@ -5,28 +5,6 @@
 
 using json = nlohmann::json;
 
-// ═══════════════════════════════════════════════════════════════
-// GeometryBuilder — Produit un arbre CSG pour le Geometric Kernel
-//
-// Convention du kernel :
-//   - Y est l'axe de révolution (toutes les primitives 2D sont
-//     dans le plan (r, y) où r = sqrt(x² + z²))
-//   - Les points CompositeSpline2D sont [r, y]
-//   - La Box est centrée avec bounds [half_x, half_y, half_z]
-//
-// Arbre CSG :
-//   Intersect(
-//     Subtract(
-//       CompositeSpline2D(external, thickness=0),  → demi-plan externe
-//       CompositeSpline2D(internal, thickness=0)    → demi-plan interne
-//     ),
-//     Box(bounding_box)
-//   )
-//
-// Le Subtract creuse l'intérieur : tout ce qui est entre le profil
-// externe et le profil interne est la paroi.
-// ═══════════════════════════════════════════════════════════════
-
 json GeometryBuilder::build(const ProblemDefinition &problem,
                             const ExpressionEvaluator::Context &ctx) {
 
@@ -41,7 +19,7 @@ json GeometryBuilder::build(const ProblemDefinition &problem,
   float z_throat = get("z_throat", 0.12f);
   float r_inlet = get("r_inlet", r_exit * 1.2f);
   float wall = get("wall_thickness", 0.005f);
-  wall = std::max(wall, 0.001f); // Épaisseur min visible
+  wall = std::max(wall, 0.0005f);
 
   // Collecter les profile_r
   std::vector<float> profileR;
@@ -52,19 +30,24 @@ json GeometryBuilder::build(const ProblemDefinition &problem,
     profileR.push_back(it->second);
   }
 
-  bool useProfileR =
-      profileR.size() >= 3 &&
-      (*std::max_element(profileR.begin(), profileR.end()) -
-       *std::min_element(profileR.begin(), profileR.end())) > 0.001f;
+  // Détecter si profileR est un vrai profil optimisé ou juste l'init par défaut
+  bool useProfileR = false;
+  if (profileR.size() >= 3) {
+    float minR = *std::min_element(profileR.begin(), profileR.end());
+    float maxR = *std::max_element(profileR.begin(), profileR.end());
+    float avgR = (minR + maxR) * 0.5f;
+    useProfileR = (maxR - minR) > 0.01f * avgR;
+  }
 
   // ── Construire les points [r, y] ──
-  // y = position axiale, centrée sur y=0 (kernel convention)
+  // Convention kernel : Y = axe de révolution, r = distance radiale
+  // Les points sont centrés sur y=0
   float yOffset = L_nozzle * 0.5f;
   json internalPts = json::array();
   json externalPts = json::array();
-
-  int N = 10;
   float maxR = 0.0f;
+
+  int N = 12; // Nombre de points sur le profil
 
   for (int i = 0; i <= N; i++) {
     float t = (float)i / N;
@@ -77,6 +60,7 @@ json GeometryBuilder::build(const ProblemDefinition &problem,
       float frac = idx_f - idx_lo;
       r = profileR[idx_lo] * (1.0f - frac) + profileR[idx_lo + 1] * frac;
     } else {
+      // Profil conique convergent-divergent
       if (yAxial <= z_throat) {
         float frac = (z_throat > 1e-10f) ? yAxial / z_throat : 0.0f;
         r = r_inlet + frac * (r_throat - r_inlet);
@@ -87,38 +71,36 @@ json GeometryBuilder::build(const ProblemDefinition &problem,
       }
     }
 
-    r = std::max(r, 0.002f);
-    float y = yAxial - yOffset; // Centrer sur y=0
+    r = std::max(r, 0.001f);
+    float y = yAxial - yOffset;
 
     internalPts.push_back({r, y});
     externalPts.push_back({r + wall, y});
     maxR = std::max(maxR, r + wall);
   }
 
-  float halfY = L_nozzle * 0.5f + 0.002f;
-  maxR += 0.005f;
+  float halfY = L_nozzle * 0.5f + 0.001f;
+  maxR += 0.002f;
 
   // ── Arbre CSG ──
-  // Subtract(externe_demiplan, interne_demiplan) → coque
-  // Intersect avec Box → couper les bords nets
-  json tree = {
-      {"type", "Intersect"},
-      {"left",
-       {{"type", "Subtract"},
-        {"base",
-         {{"type", "CompositeSpline2D"},
-          {"role", "external_wall"},
-          {"points", externalPts},
-          {"thickness", 0.0f}}}, // thickness=0 → mode demi-plan signé
-        {"subtract",
-         {{"type", "CompositeSpline2D"},
-          {"role", "internal_wall"},
-          {"points", internalPts},
-          {"thickness", 0.0f}}}}}, // thickness=0 → mode demi-plan signé
-      {"right",
-       {{"type", "Box"},
-        {"position", {0, 0, 0}},            // Centré à l'origine
-        {"bounds", {maxR, halfY, maxR}}}}}; // [x, y, z] — y est l'axe
+  // Subtract(demi-plan_externe, demi-plan_interne) intersecté par Box
+  json tree = {{"type", "Intersect"},
+               {"left",
+                {{"type", "Subtract"},
+                 {"base",
+                  {{"type", "CompositeSpline2D"},
+                   {"role", "external_wall"},
+                   {"points", externalPts},
+                   {"thickness", 0.0f}}},
+                 {"subtract",
+                  {{"type", "CompositeSpline2D"},
+                   {"role", "internal_wall"},
+                   {"points", internalPts},
+                   {"thickness", 0.0f}}}}},
+               {"right",
+                {{"type", "Box"},
+                 {"position", {0, 0, 0}},
+                 {"bounds", {maxR, halfY, maxR}}}}};
 
   return tree;
 }
