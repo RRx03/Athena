@@ -263,11 +263,18 @@ simd::float3 ExpressionEvaluator::Parser::parsePointConstruction() {
   float c0 = parseExpr();
   expect(TOK_COMMA);
   float c1 = parseExpr();
-  float c2 = 0.0f;
-  if (match(TOK_COMMA))
-    c2 = parseExpr();
+
+  if (match(TOK_COMMA)) {
+    // 3 composantes : @[x, y, z] ou @[r, θ, z] → direct mapping
+    float c2 = parseExpr();
+    expect(TOK_RBRACKET);
+    return simd::float3{c0, c1, c2};
+  }
+
+  // 2 composantes : @[r, z] en axisymétrique → float3(r, 0, z)
+  // r va en .x (radial), z va en .z (axial), y=0 (θ=0 implicite)
   expect(TOK_RBRACKET);
-  return simd::float3{c0, c1, c2};
+  return simd::float3{c0, 0.0f, c1};
 }
 
 float ExpressionEvaluator::Parser::parseFunctionCall(const std::string &funcName) {
