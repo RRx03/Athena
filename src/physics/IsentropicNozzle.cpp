@@ -1,4 +1,4 @@
-#include "physics/IsentropicNozzle.hpp"
+#include "IsentropicNozzle.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -82,6 +82,14 @@ void IsentropicNozzle::setup(const ProblemDefinition &problem,
       _gamma = props.at("gamma");
     if (props.count("R_specific"))
       _R_gas = props.at("R_specific");
+  }
+
+  // Lire la densité du matériau de paroi
+  auto wallIt = problem.materials.find("wall");
+  if (wallIt != problem.materials.end()) {
+    auto &wProps = wallIt->second.properties;
+    if (wProps.count("density"))
+      _wallDensity = wProps.at("density");
   }
 
   // Lire T0 et P0 depuis les distributions BC inlet
@@ -338,6 +346,32 @@ float IsentropicNozzle::fieldAt(const std::string &quantity,
     return _P0;
   if (quantity == "total_temperature")
     return _T0;
+
+  // Grandeurs qui nécessitent une intégration sur tout le profil
+  if (quantity == "total_mass") {
+    // Masse = ∫ ρ_mat × 2π × r × t(z) × dz le long de l'axe
+    // Approximation : somme sur les stations
+    float mass = 0.0f;
+    for (size_t i = 0; i + 1 < _stations.size(); i++) {
+      float dz = _stations[i + 1].z - _stations[i].z;
+      float r_avg = (_stations[i].r + _stations[i + 1].r) * 0.5f;
+      // Épaisseur de paroi estimée via la pression locale
+      float P = (_stations[i].pressure + _stations[i + 1].pressure) * 0.5f;
+      float sigma = 690e6f; // σ_yield/SF par défaut (sera lu du contexte)
+      float t_wall = (P * r_avg) / std::max(sigma - 0.6f * P, 1.0f);
+      mass += _wallDensity * 2.0f * M_PI * r_avg * t_wall * dz;
+    }
+    return mass;
+  }
+
+  if (quantity == "wall_temp_max") {
+    // En isentropique sans refroidissement, T_paroi ≈ T_stagnation au col
+    // (pire cas : vitesse faible → récupération totale)
+    return _T0;
+  }
+
+  if (quantity == "exit_mach")
+    return _exitMach;
 
   return 0.0f;
 }

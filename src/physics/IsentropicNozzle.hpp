@@ -47,6 +47,7 @@ private:
   float _T0 = 300.0f;
   float _P0 = 101325.0f;
   float _P_ambient = 101325.0f;
+  float _wallDensity = 8190.0f; // kg/m³ (Inconel 718 par défaut)
 
   // Grandeurs globales calculées
   float _thrust = 0.0f;

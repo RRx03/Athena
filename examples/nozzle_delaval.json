@@ -35,8 +35,9 @@
     "method": "nelder_mead",
     "precision": "standard",
     "dynamic_params": { "fidelity_levels": [
-      { "samples": 10, "max_iterations": 100, "physics": "isentropic_1d" },
-      { "samples": 50, "max_iterations": 50, "physics": "isentropic_1d" }
+      { "samples": 10, "max_iterations": 200, "physics": "isentropic_1d" },
+      { "samples": 30, "max_iterations": 200, "physics": "isentropic_1d" },
+      { "samples": 50, "max_iterations": 100, "physics": "isentropic_1d" }
     ] }
   }
 }
