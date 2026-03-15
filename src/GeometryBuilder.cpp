@@ -5,6 +5,19 @@
 
 using json = nlohmann::json;
 
+// ═══════════════════════════════════════════════════════════════
+// GeometryBuilder — Construit le CSG depuis les paramètres optimisés
+//
+// IMPORTANT : on utilise TOUJOURS le profil conique défini par
+// r_throat, r_exit, z_throat, L_nozzle. Ce sont les paramètres
+// que le solveur optimise réellement (via IsentropicNozzle).
+//
+// Les profile_r[] sont ignorés pour l'instant car ils ne sont
+// pas contraints en forme (pas de continuité, pas de monotonie
+// dans le convergent/divergent). Ils seront utilisés quand on
+// ajoutera des contraintes de lissage B-spline dans le solveur.
+// ═══════════════════════════════════════════════════════════════
+
 json GeometryBuilder::build(const ProblemDefinition &problem,
                             const ExpressionEvaluator::Context &ctx) {
 
@@ -17,58 +30,55 @@ json GeometryBuilder::build(const ProblemDefinition &problem,
   float r_exit = get("r_exit", 0.035f);
   float L_nozzle = get("L_nozzle", 0.3f);
   float z_throat = get("z_throat", 0.12f);
-  float r_inlet = get("r_inlet", r_exit * 1.2f);
-  float wall = get("wall_thickness", 0.005f);
-  wall = std::max(wall, 0.0005f);
 
-  // Collecter les profile_r
-  std::vector<float> profileR;
-  for (int i = 0; i < 100; i++) {
-    auto it = ctx.parameters.find("profile_r[" + std::to_string(i) + "]");
-    if (it == ctx.parameters.end())
-      break;
-    profileR.push_back(it->second);
-  }
+  // Rayon d'entrée : plus grand que le col et la sortie
+  float r_inlet = std::max(r_exit, r_throat) * 1.3f;
 
-  // Détecter si profileR est un vrai profil optimisé ou juste l'init par défaut
-  bool useProfileR = false;
-  if (profileR.size() >= 3) {
-    float minR = *std::min_element(profileR.begin(), profileR.end());
-    float maxR = *std::max_element(profileR.begin(), profileR.end());
-    float avgR = (minR + maxR) * 0.5f;
-    useProfileR = (maxR - minR) > 0.01f * avgR;
-  }
+  // Épaisseur de paroi — minimum visuel pour le rendu
+  float wall_real = get("wall_thickness", 0.005f);
+  float wall =
+      std::max(wall_real, r_throat * 0.15f); // Au moins 15% du rayon du col
 
-  // ── Construire les points [r, y] ──
-  // Convention kernel : Y = axe de révolution, r = distance radiale
-  // Les points sont centrés sur y=0
+  // Convention kernel : Y = axe de révolution
   float yOffset = L_nozzle * 0.5f;
+
+  // ── Construire le profil convergent-divergent ──
+  // Plus de points dans les zones de courbure (col)
   json internalPts = json::array();
   json externalPts = json::array();
   float maxR = 0.0f;
 
-  int N = 12; // Nombre de points sur le profil
+  // Points stratégiques : entrée, convergent, col, divergent, sortie
+  struct ProfPt {
+    float frac;
+  }; // fraction de L_nozzle
+  float throatFrac = (L_nozzle > 1e-10f) ? z_throat / L_nozzle : 0.4f;
 
-  for (int i = 0; i <= N; i++) {
-    float t = (float)i / N;
-    float yAxial = t * L_nozzle;
+  // Répartir les points avec plus de densité autour du col
+  std::vector<float> fracs;
+  int nConv = 5; // Points dans le convergent
+  int nDiv = 7;  // Points dans le divergent
+  for (int i = 0; i <= nConv; i++)
+    fracs.push_back(throatFrac * (float)i / nConv);
+  for (int i = 1; i <= nDiv; i++)
+    fracs.push_back(throatFrac + (1.0f - throatFrac) * (float)i / nDiv);
+
+  for (float frac : fracs) {
+    float yAxial = frac * L_nozzle;
     float r;
 
-    if (useProfileR) {
-      float idx_f = t * (profileR.size() - 1);
-      int idx_lo = std::clamp((int)idx_f, 0, (int)profileR.size() - 2);
-      float frac = idx_f - idx_lo;
-      r = profileR[idx_lo] * (1.0f - frac) + profileR[idx_lo + 1] * frac;
+    if (yAxial <= z_throat) {
+      // Convergent : profil lisse (cosinus pour un col arrondi)
+      float t = (z_throat > 1e-10f) ? yAxial / z_throat : 0.0f;
+      // Interpolation cosinus pour un col lisse
+      float smooth_t = 0.5f * (1.0f - std::cos(t * M_PI));
+      r = r_inlet + smooth_t * (r_throat - r_inlet);
     } else {
-      // Profil conique convergent-divergent
-      if (yAxial <= z_throat) {
-        float frac = (z_throat > 1e-10f) ? yAxial / z_throat : 0.0f;
-        r = r_inlet + frac * (r_throat - r_inlet);
-      } else {
-        float denom = L_nozzle - z_throat;
-        float frac = (denom > 1e-10f) ? (yAxial - z_throat) / denom : 0.0f;
-        r = r_throat + frac * (r_exit - r_throat);
-      }
+      // Divergent : profil lisse
+      float denom = L_nozzle - z_throat;
+      float t = (denom > 1e-10f) ? (yAxial - z_throat) / denom : 0.0f;
+      float smooth_t = 0.5f * (1.0f - std::cos(t * M_PI));
+      r = r_throat + smooth_t * (r_exit - r_throat);
     }
 
     r = std::max(r, 0.001f);
@@ -79,11 +89,10 @@ json GeometryBuilder::build(const ProblemDefinition &problem,
     maxR = std::max(maxR, r + wall);
   }
 
-  float halfY = L_nozzle * 0.5f + 0.001f;
-  maxR += 0.002f;
+  float halfY = L_nozzle * 0.5f + 0.002f;
+  maxR += 0.005f;
 
   // ── Arbre CSG ──
-  // Subtract(demi-plan_externe, demi-plan_interne) intersecté par Box
   json tree = {{"type", "Intersect"},
                {"left",
                 {{"type", "Subtract"},
